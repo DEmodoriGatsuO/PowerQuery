@@ -1,0 +1,24 @@
+let
+    Source = List.Dates(#date(#"This Year", 1, 1), #"Total Days Of Three Years", #duration(1, 0, 0, 0)),
+    TableFromList = Table.FromList(Source, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+    SetColumnNameToDate = Table.RenameColumns(TableFromList,{{"Column1", "Date"}}),
+    AddColumnYear = Table.AddColumn(SetColumnNameToDate, "Year", each Date.Year([Date]), Int64.Type),
+    AddColumnFormatYear = Table.AddColumn(AddColumnYear, "yyyy年", each Date.ToText([Date],[Format="yyyy年"])),
+    AddColumnMonth = Table.AddColumn(AddColumnFormatYear, "月", each Date.Month([Date]), Int64.Type),
+    AddColumnFormatMonth = Table.AddColumn(AddColumnMonth, "MM月", each Date.ToText([Date],[Format="MM月"])),
+    AddColumnDay = Table.AddColumn(AddColumnFormatMonth, "日", each Date.Day([Date]), Int64.Type),
+    AddColumnFormatDay = Table.AddColumn(AddColumnDay, "dd日", each Date.ToText([Date],[Format="dd日"])),
+    AddColumnYYYYMM = Table.AddColumn(AddColumnFormatDay, "yyyy年MM月", each Date.ToText([Date],[Format="yyyy年MM月"])),
+    AddColumnWeekday = Table.AddColumn(AddColumnYYYYMM, "曜日名", each Date.DayOfWeekName([Date]), type text),
+    AddColumnFormatWeekday = Table.AddColumn(AddColumnWeekday, "曜日", each Text.Start([曜日名], 1), type text),
+    AddColumnNumberQuarter = Table.AddColumn(AddColumnFormatWeekday, "四半期", each Date.QuarterOfYear([Date]), Int64.Type),
+    AddColumnFormatQuarter = Table.AddColumn(AddColumnNumberQuarter, "Quarter", each Text.Combine({Text.From([四半期], "ja-JP"), "Q"}), type text),
+    AddColumnHolidayColumn = Table.AddColumn(AddColumnFormatQuarter, "休日", each if [曜日] = "土" then "休日" else if [曜日] = "日" then "休日" else null),
+    MergeTableCabinetOfficeFromWeb = Table.NestedJoin(AddColumnHolidayColumn, {"Date"}, #"Cabinet Office", {"国民の祝日・休日月日"}, "Cabinet Office", JoinKind.LeftOuter),
+    ExpandTableCabinetOfficeFromWeb = Table.ExpandTableColumn(MergeTableCabinetOfficeFromWeb, "Cabinet Office", {"国民の祝日・休日名称"}, {"国民の祝日・休日名称"}),
+    AddJapaneseHoliday = Table.AddColumn(ExpandTableCabinetOfficeFromWeb, "祝日", each if [#"国民の祝日・休日名称"] <> null then "祝日" else null),
+    AddColumnTotalHoliday = Table.AddColumn(AddJapaneseHoliday, "Holiday", each if [休日] = "休日" then "休日" else if [祝日] = "祝日" then "休日" else null),
+    AddColumnBusinessDay = Table.AddColumn(AddColumnTotalHoliday, "BusinessDay", each if [Holiday] = null then "営業日" else null),
+    ReorderColumns = Table.ReorderColumns(AddColumnBusinessDay,{"Date", "Year", "yyyy年", "月", "MM月", "日", "dd日", "yyyy年MM月", "曜日名", "曜日", "四半期", "Quarter", "BusinessDay", "Holiday", "休日", "祝日" , "国民の祝日・休日名称"})
+in
+    ReorderColumns
