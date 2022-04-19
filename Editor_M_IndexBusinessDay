@@ -1,0 +1,13 @@
+let
+    Source = #"Calendar Table",
+    SelectColumns1 = Table.SelectColumns(Source,{"Date", "yyyy年MM月", "BusinessDay"}),
+    FilterBusinessDay = Table.SelectRows(SelectColumns1, each ([BusinessDay] = "営業日")),
+    ToGroup = Table.Group(FilterBusinessDay, {"yyyy年MM月", "BusinessDay"}, {{"テーブル化", each _, type table [Date=date, yyyy年MM月=text, BusinessDay=text]}}),
+    AddCustom = Table.AddColumn(ToGroup, "カスタム", each Table.AddIndexColumn([テーブル化],"インデックス",1)),
+    AddIndexBusinessDay = Table.ExpandTableColumn(AddCustom, "カスタム", {"Date", "インデックス"}, {"Date", "営業日"}),
+    SelectColumns2 = Table.SelectColumns(AddIndexBusinessDay,{"Date", "営業日"}),
+    AddColumnYear = Table.AddColumn(SelectColumns2, "Year", each Date.Year([Date]), Int64.Type),
+    AddColumnMonth = Table.AddColumn(AddColumnYear, "Month", each Date.Month([Date]), Int64.Type),
+    ReorderColumns = Table.ReorderColumns(AddColumnMonth,{"Date", "Year", "Month", "営業日"})
+in
+    ReorderColumns
